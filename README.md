@@ -18,29 +18,25 @@ Basic Usage:
 
 ```php
         
-        $client = new \phpcent\Client("http://localhost:8000");
-        $client->setSecret("secret key from Centrifugo");
+		//to backend api
+        $client = new \phpcent2\Client("http://localhost:8000");
+        $client->setApikey("api key from Centrifugo");//to backend api
         $client->publish("main_feed", ["message" => "Hello Everybody"]);
         $history = $client->history("main_feed");
+
+		//to get token
+        $client->setSecret("secret key from Centrifugo");
+        $token = $client->getToken([
+				"data"=>[],
+				"sub"=>1
+		]);
         
 ```
 
-You can use `phpcent` to create frontend token:
+You can use `phpcent2` to create frontend token:
 
 ```php
-	$token = $client->setSecret($pSecret)->generateClientToken($user, $timestamp);
-```
-
-Or to create private channel sign:
-
-```php
-	$sign = $client->setSecret($pSecret)->generateClientToken($client, $channel);
-```
-
-Since 1.0.3 phpcent has broadcast implementation.
-
-```php
-$client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 'state' => '1']);
+	$token = $client->setSecret($pSecret)->getToken($data);
 ```
 
 ### SSL
@@ -48,15 +44,15 @@ $client->broadcast(['example:entities', 'example:moar'], ['user_id' => 2321321, 
 In case if your Centrifugo server has invalid SSL certificate, you can use:
 
 ```php
-\phpcent\Transport::setSafety(\phpcent\Transport::UNSAFE);
+\phpcent2\Transport::setSafety(\phpcent\Transport::UNSAFE);
 ```
 
 Since 1.0.5 you can use self signed certificate in safe manner:
 
 ```php
-$client = new \phpcent\Client("https://localhost:8000");
+$client = new \phpcent2\Client("https://localhost:8000");
 $client->setSecret("secret key from Centrifugo");
-$transport = new \phpcent\Transport();
+$transport = new \phpcent2\Transport();
 $transport->setCert("/path/to/certificate.pem");
 $client->setTransport($transport);
 ```
