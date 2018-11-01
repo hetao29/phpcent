@@ -1,9 +1,9 @@
 <?php
-namespace phpcent;
+namespace phpcent2;
 
 class Client
 {
-    protected $secret;
+    protected $apikey;
     private $host;
     /**
      * @var ITransport $transport
@@ -27,6 +27,15 @@ class Client
         return $this;
     }
 
+	/**
+	 * https://centrifugal.github.io/centrifugo/server/api/
+	 * set api key for Server HTTP API
+	 */
+    public function setApiKey($apikey)
+    {
+        $this->apikey= $apikey;
+        return $this;
+    }
     /**
      * send message into channel of namespace. data is an actual information you want to send into channel
      *
@@ -89,6 +98,17 @@ class Client
     }
 
     /**
+     * get channel presence_stats information
+     *
+     * @param $channel
+     * @return mixed
+     */
+    public function presence_stats($channel)
+    {
+        return $this->send("presence_stats", ["channel" => $channel]);
+    }
+
+    /**
      * get channel history information (list of last messages sent into channel).
      *
      * @param $channel
@@ -110,13 +130,13 @@ class Client
     }
 
     /**
-     * get stats information about running server nodes.
+     * get information about running server nodes.
      *
      * @return mixed
      */
-    public function stats()
+    public function info()
     {
-        return $this->send("stats", []);
+        return $this->send("info", []);
     }
 
     /**
@@ -127,6 +147,7 @@ class Client
      */
     public function send($method, $params = [])
     {
+        $this->checkApiKey();
         if (empty($params)) {
             $params = new \StdClass();
         }
@@ -136,80 +157,19 @@ class Client
             $this->getTransport()
                 ->communicate(
                     $this->host,
-                    ["data" => $data, "sign" => $this->generateApiSign($data)]
+					$data, 
+					$this->apikey
                 );
     }
 
     /**
-     * Check that secret key set
+     * Check that api key set
      * @throws \Exception
      */
-    private function checkKey()
+    private function checkApiKey()
     {
-        if ($this->secret == null)
-            throw new \Exception("Secret must be set");
-    }
-
-    /**
-     * @param $data
-     * @return string $hash
-     * @throws \Exception if required data not specified
-     */
-    public function generateApiSign($data)
-    {
-        $this->checkKey();
-        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
-        hash_update($ctx, $data);
-
-        return hash_final($ctx);
-    }
-
-    /**
-     * Generate client connection token
-     *
-     * @param string $user
-     * @param string $timestamp
-     * @param string $info
-     * @return string
-     */
-    public function generateClientToken($user, $timestamp, $info = "")
-    {
-        $this->checkKey();
-        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
-        hash_update($ctx, $user);
-        hash_update($ctx, $timestamp);
-        hash_update($ctx, $info);
-
-        return hash_final($ctx);
-    }
-
-    /**
-     * @param string $client
-     * @param string $channel
-     * @param string $info
-     * @return string
-     */
-    public function generateChannelSign($client, $channel, $info = "")
-    {
-        $this->checkKey();
-        $ctx = hash_init("sha256", HASH_HMAC, $this->secret);
-        hash_update($ctx, $client);
-        hash_update($ctx, $channel);
-        hash_update($ctx, $info);
-
-        return hash_final($ctx);
-    }
-
-    /**
-     * @return ITransport
-     */
-    private function getTransport()
-    {
-        if ($this->transport == null) {
-            $this->setTransport(new Transport());
-        }
-
-        return $this->transport;
+        if ($this->apikey == null)
+            throw new \Exception("Apikey must be set");
     }
 
     /**
@@ -220,4 +180,191 @@ class Client
         $this->transport = $transport;
     }
 
+}
+class Transport implements ITransport
+{
+    const SAFE = 1;
+    const UNSAFE = 2;
+
+    protected static $safety = self::SAFE;
+
+    /**
+     * @var string Certificate file name
+     * @since 1.0.5
+     */
+    private $cert;
+    /**
+     * @var string Directory containing CA certificates
+     * @since 1.0.5
+     */
+    private $caPath;
+
+    /**
+     * @var int|null
+     */
+    private $connectTimeoutOption;
+
+    /**
+     * @var int|null
+     */
+    private $timeoutOption;
+
+    /**
+     * @param mixed $safety
+     */
+    public static function setSafety($safety)
+    {
+        self::$safety = $safety;
+    }
+
+    /**
+     *
+     * @param string $host
+     * @param mixed $data
+     * @return mixed
+     * @throws TransportException
+     */
+    public function communicate($host, $data, $apikey)
+    {
+		$headers = array(
+			'Authorization: apikey '.$apikey,
+			'Content-Type: application/json'
+		);
+        $ch = curl_init("$host/api");
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+
+        if ($this->connectTimeoutOption !== null) {
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeoutOption);
+        }
+        if ($this->timeoutOption !== null) {
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutOption);
+        }
+
+        if (self::$safety === self::UNSAFE) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        } elseif (self::$safety === self::SAFE) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
+            if (null !== $this->cert) {
+                curl_setopt($ch, CURLOPT_CAINFO, $this->cert);
+            }
+            if (null !== $this->caPath) {
+                curl_setopt($ch, CURLOPT_CAPATH, $this->caPath);
+            }
+        }
+
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        $headers = curl_getinfo($ch);
+        curl_close($ch);
+
+        if (empty($headers["http_code"]) || ($headers["http_code"] != 200)) {
+            throw new TransportException ("Response code: "
+                . $headers["http_code"]
+                . PHP_EOL
+                . "cURL error: " . $error . PHP_EOL
+                . "Body: "
+                . $response
+            );
+        }
+
+        return json_decode($response, true);
+    }
+
+    /**
+     * @return string|null
+     * @since 1.0.5
+     */
+    public function getCert()
+    {
+        return $this->cert;
+    }
+
+    /**
+     * @param string|null $cert
+     * @since 1.0.5
+     */
+    public function setCert($cert)
+    {
+        $this->cert = $cert;
+    }
+
+    /**
+     * @return string|null
+     * @since 1.0.5
+     */
+    public function getCAPath()
+    {
+        return $this->caPath;
+    }
+
+    /**
+     * @param string|null $caPath
+     * @since 1.0.5
+     */
+    public function setCAPath($caPath)
+    {
+        $this->caPath = $caPath;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getConnectTimeoutOption()
+    {
+        return $this->connectTimeoutOption;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getTimeoutOption()
+    {
+        return $this->timeoutOption;
+    }
+
+    /**
+     * @param int|null $connectTimeoutOption
+     * @return Transport
+     */
+    public function setConnectTimeoutOption($connectTimeoutOption)
+    {
+        $this->connectTimeoutOption = $connectTimeoutOption;
+
+        return $this;
+    }
+
+    /**
+     * @param int|null $timeoutOption
+     * @return Transport
+     */
+    public function setTimeoutOption($timeoutOption)
+    {
+        $this->timeoutOption = $timeoutOption;
+
+        return $this;
+    }
+}
+interface ITransport
+{
+
+    /**
+     * @param $host
+     * @param $data
+     * @return mixed
+     */
+    public function communicate($host, $data, $apikey);
+
+} 
+class TransportException extends Exception
+{
+    
 }

@@ -6,16 +6,3 @@
  * Time: 15:26
  */
 
-namespace phpcent;
-
-interface ITransport
-{
-
-    /**
-     * @param $host
-     * @param $data
-     * @return mixed
-     */
-    public function communicate($host, $data);
-
-} 
