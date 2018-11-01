@@ -13,9 +13,7 @@
     "require":{
         "php": ">=5.3.0",
         "ext-json":"*",
-        "ext-curl":"*"
-    },
-    "require-dev": {
+        "ext-curl":"*",
         "firebase/php-jwt": ">=5.0.0"
     }
 }
