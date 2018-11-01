@@ -7,7 +7,7 @@ Library is published on the Composer: https://packagist.org/packages/sl4mmer/php
 ```php
 {
     "require": {
-        "sl4mmer/phpcent":"dev-master",
+        "hetao29/phpcent2":"dev-master",
     }
 }
 ```

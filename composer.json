@@ -1,9 +1,9 @@
 {
-    "name": "sl4mmer/phpcent",
-    "description":"Php library to communicate with Centrifugo/Centrifuge)",
+    "name": "hetao29/phpcent2",
+    "description":"Php library to communicate with Centrifugo v2.x",
     "keywords": ["centrifugo"],
     "homepage": "https://github.com/centrifugal/phpcent",
-    "version": "1.0.5",
+    "version": "1.0",
     "license": "MIT",
     "autoload": {
         "psr-0" : {
@@ -14,6 +14,7 @@
     "require":{
         "php": ">=5.3.0",
         "ext-json":"*",
+		"firebase/php-jwt":"*",
         "ext-curl":"*"
     }
 }
